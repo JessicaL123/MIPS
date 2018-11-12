@@ -1,0 +1,151 @@
+#i/o and bit manipulation
+		
+				
+		.data
+filename: 	.asciiz "hw4_sentence.txt"  #file name
+message:	.asciiz "The quick brown fox jumps over the lazy river."
+buffer1: 	.space 100     #space to store strings to be read
+buffer2: 	.space 100     #space for parity strings
+okMessage:	.asciiz "OK, data is ok"
+notOkMessage:	.asciiz "NOT OK, data has been corrupted"
+
+.text
+main:
+
+		li $v0,	13		# created file
+		la $a0,	filename
+		li $a1,	1		# file flag(flags are 0: read, 1: write)
+		li $a2,	0
+		syscall
+		move $s2, $v0		# move descriptor to s2
+
+		li $v0,	15		#enter text in file: "The quick brown fox jumps over the lazy river."
+		move $a0, $s2		
+		la $a1,	message
+		li $a2,	44
+		syscall
+
+		li $v0,	16		#close file
+		move $a0, $s2
+		syscall
+
+
+		li $v0, 13		#open file
+		li $a1, 0		# file flag(flags are 0: read, 1: write)
+		la $a0, filename	# load file name
+		li $a2, 0		# file mode (not used)
+		syscall		
+		move $s2, $v0		# move descriptor to s2
+		
+		
+		li $v0, 14		#read file
+		move $a0, $s2		#file descriptor
+		la $a1, buffer1		# address of input buffer
+		li $a2, 100		# maximum number of characters to read
+		syscall  
+		
+		
+		li $v0, 16		#close file
+		move $a0, $s2		# file descriptor 
+		syscall
+		
+
+				
+#generate even parity:
+		li $t0, 0		#use to calculate how many characters have been loaded to buffer2
+		la $a1, buffer1
+		la $a2, buffer2 	
+						
+paritySetLoop:	
+		bge $t0, 50, exitParitySet #exit if more than 49
+		lbu $t1, ($a1)		#read a byte from the first buffer into a register
+		li $s0, 0		#use to count how many 1s
+		li $s1, 1		#use to find each bit in byte is 0 or 1 
+		
+eachBitInByte:	
+		bgt  $s1, 65, CheckEven #only check 7 bits of one byte, if more than 64, than it is finished to count 1s
+		and $t2, $t1, $s1
+		sll $s1, $s1, 1
+		beq $t2, $zero, eachBitInByte
+		addi $s0, $s0, 1
+		j eachBitInByte
+
+CheckEven:				
+		divu $t6, $s0, 2
+		mfhi $t8
+		beq $t8, $zero, evenOnes #the case that all the ones are even in the 7 bits 			
+		#if the ones in the load bit are not even 
+		ori $t1, $t1, 128	# set parity bit in the character to one at position 7	
+		
+		
+evenOnes:
+		sb $t1, ($a2)		# write the byte to buffer2
+   		addi $a1,$a1,1		#point to next character in buffer1 
+  		addi $a2,$a2,1		#point to next character in buffer2
+   		addi $t0,$t0,1		#loop counter
+   		j paritySetLoop
+
+		
+# check parity:												
+exitParitySet:  
+		la $a2, buffer2
+		li $t0, 0 		# use to count how many loops for counting characters 		
+checkParity:	
+		bge $t0, 50, okEvenPrint #counter: exit if more than 49
+		lbu $t1, ($a2)		#load one byte to check whether it is all even
+		li $s0, 0		#use to count how many 1s
+		li $s1, 1		#use to find each bit in byte is 0 or 1 
+		
+eachBitInByte2:	
+		bgt  $s1, 129, CheckEven2 #only check 8 bits of one byte, if more than 128, than it is finished to count 1s
+		and $t2, $t1, $s1
+		sll $s1, $s1, 1
+		beq $t2, $zero, eachBitInByte2
+		addi $s0, $s0, 1
+		j eachBitInByte2
+
+CheckEven2:				
+		divu $t6, $s0, 2
+		mfhi $t8
+		beq $t8, $zero, okEvenNext #the case that all the ones are even in the 8 bits 					
+		#if the ones in the load bit are not even 				
+ 		li $v0, 4
+ 		la $a0, notOkMessage	# print not ok
+ 		syscall	
+ 		j exitChecker
+ 
+okEvenNext:	
+  		addi $a2,$a2,1		#point to next character in buffer2
+   		addi $t0,$t0,1		#loop counter		
+ 		j checkParity
+		
+okEvenPrint:
+ 		li $v0, 4		#print ok when all the numbers are even 
+ 		la $a0, okMessage
+ 		syscall
+ 		j exitChecker		
+
+   
+#exit:   
+exitChecker:
+		li $v0, 10
+		syscall
+		
+		
+# TestRuns:
+# 1.  run the program:
+# OK, data is ok
+# -- program is finished running --	
+
+# 2. set a breakpoint at checkParity(line 95). 
+# changed the data segment position at value(+c) and 0x100100a0:  0x72e2a0eb to 0x72e2a0ea
+# NOT OK, data has been corrupted
+# -- program is finished running --		
+		
+		
+		
+		
+		
+		
+		
+		
